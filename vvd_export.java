@@ -19,22 +19,7 @@ import javax.xml.transform.stream.*;
 import org.apache.xml.serializer.OutputPropertiesFactory;
 import org.w3c.dom.*;
 
-class Brick {
-	public int x_, y_, z_;
-	public int w_, h_, d_;
-	public long offset_, size_;
-	public double tx0_, ty0_, tz0_, tx1_, ty1_, tz1_;
-	public double bx0_, by0_, bz0_, bx1_, by1_, bz1_;
-	Brick(int x, int y, int z, int w, int h, int d, long offset, long size,
-		  double tx0, double ty0, double tz0, double tx1, double ty1, double tz1,
-		  double bx0, double by0, double bz0, double bx1, double by1, double bz1){
-		x_ = x; y_ = y; z_ = z;
-		w_ = w; h_ = h; d_ = d;
-		offset_ = offset; size_ = size;
-		tx0_ = tx0; ty0_ = ty0; tz0_ = tz0; tx1_ = tx1; ty1_ = ty1; tz1_ = tz1;
-		bx0_ = bx0; by0_ = by0; bz0_ = bz0; bx1_ = bx1; by1_ = by1; bz1_ = bz1;
-	}
-}
+
 
 public class vvd_export implements PlugIn {
 	String basename;
@@ -46,6 +31,23 @@ public class vvd_export implements PlugIn {
 	ArrayList<Integer> bwlist = new ArrayList<Integer>();
 	ArrayList<Integer> bhlist = new ArrayList<Integer>();
 	ArrayList<Integer> bdlist = new ArrayList<Integer>();
+
+	class Brick {
+		public int x_, y_, z_;
+		public int w_, h_, d_;
+		public long offset_, size_;
+		public double tx0_, ty0_, tz0_, tx1_, ty1_, tz1_;
+		public double bx0_, by0_, bz0_, bx1_, by1_, bz1_;
+		Brick(int x, int y, int z, int w, int h, int d, long offset, long size,
+			  double tx0, double ty0, double tz0, double tx1, double ty1, double tz1,
+			  double bx0, double by0, double bz0, double bx1, double by1, double bz1){
+			x_ = x; y_ = y; z_ = z;
+			w_ = w; h_ = h; d_ = d;
+			offset_ = offset; size_ = size;
+			tx0_ = tx0; ty0_ = ty0; tz0_ = tz0; tx1_ = tx1; ty1_ = ty1; tz1_ = tz1;
+			bx0_ = bx0; by0_ = by0; bz0_ = bz0; bx1_ = bx1; by1_ = by1; bz1_ = bz1;
+		}
+	}
 
 	public void run(String arg) {
 		if (IJ.versionLessThan("1.49d")) return;
@@ -506,7 +508,7 @@ public class vvd_export implements PlugIn {
 			
 		}
 		
-		File newXMLfile = new File(directory + basename + ".xml");
+		File newXMLfile = new File(directory + basename + ".vvd");
 		writeXML(newXMLfile, doc);
 
 		imp.show();
