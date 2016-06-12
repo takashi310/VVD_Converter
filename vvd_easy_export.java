@@ -186,9 +186,9 @@ public class vvd_easy_export implements PlugIn {
 			if (bhnum % 2 == 0) bhnum++;
 			if (bdnum % 2 == 0) bdnum++;
 
-			int bw = (bwnum <= 1) ? ww : ww/bwnum+1;
-			int bh = (bhnum <= 1) ? hh : hh/bhnum+1;
-			int bd = (bdnum <= 1) ? dd : dd/bdnum+1;
+			int bw = (bwnum <= 1) ? ww : ww/bwnum+1+(ww%bwnum>0 ? 1 : 0);
+			int bh = (bhnum <= 1) ? hh : hh/bhnum+1+(hh%bhnum>0 ? 1 : 0);
+			int bd = (bdnum <= 1) ? dd : dd/bdnum+1+(dd%bdnum>0 ? 1 : 0);
 
 			bwlist.add(bw);
 			bhlist.add(bh);
@@ -520,6 +520,7 @@ public class vvd_easy_export implements PlugIn {
 							filecount++;
 							current_dataname = base_dataname+"_data"+filecount;
 							bytecount = 0;
+							offset = 0;
 							System.arraycopy(bdata, 0, packed_data, bytecount, datasize);
 							bytecount += datasize;
 						} else {
