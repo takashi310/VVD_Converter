@@ -30,8 +30,9 @@ public class vvd_easy_export implements PlugIn {
 	String directory;
 	ArrayList<String> lvImgTitle;
 	int bw = 128, bh = 128, bd = 64, lv = 1;
-	String filetype = "RAW";
-	int jpeg_quality = FileSaver.DEFAULT_JPEG_QUALITY;
+	String filetype = (String)Prefs.get("filetype.string", "RAW");
+	int jpeg_quality = (int)Prefs.get("jpeg_quality.int",FileSaver.DEFAULT_JPEG_QUALITY);
+	int bdsizelimit = (int)Prefs.get("bdsizelimit.int", 50);
 	ArrayList<Integer> bwlist = new ArrayList<Integer>();
 	ArrayList<Integer> bhlist = new ArrayList<Integer>();
 	ArrayList<Integer> bdlist = new ArrayList<Integer>();
@@ -69,9 +70,9 @@ public class vvd_easy_export implements PlugIn {
 	private boolean showDialog() {
 		String[] types = {"RAW", "JPEG", "ZLIB"};
 		GenericDialog gd = new GenericDialog("Generate Bricks");
-		gd.addChoice("FileType", types, types[0]);
+		gd.addChoice("FileType", types, filetype);
 		gd.addNumericField("JPEG quality", jpeg_quality, 0);
-
+		gd.addNumericField("Max file size (MB)", bdsizelimit, 0);
 
 		int[] wlist = WindowManager.getIDList();
 		if(wlist == null)return false;
@@ -93,13 +94,18 @@ public class vvd_easy_export implements PlugIn {
 		if (gd.wasCanceled()) return false;
 		
 		filetype = types[gd.getNextChoiceIndex()];
-		if(filetype == "JPEG")jpeg_quality = (int)gd.getNextNumber();
+		jpeg_quality = (int)gd.getNextNumber();
 		if(jpeg_quality > 100)jpeg_quality = 100;
 		if(jpeg_quality < 0)  jpeg_quality = 0;
+		bdsizelimit = (int)gd.getNextNumber();
 
 		int id = gd.getNextChoiceIndex();
 		lvImgTitle = new ArrayList<String>();
 		lvImgTitle.add(titles[id]);
+
+		Prefs.set("filetype.string", filetype);
+		Prefs.set("jpeg_quality.int", jpeg_quality);
+		Prefs.set("bdsizelimit.int", bdsizelimit);
 		
 		return true;
 	}
@@ -359,10 +365,11 @@ public class vvd_easy_export implements PlugIn {
 			int curbricknum = 0;
 			for(int f = 0; f < nFrame; f++){
 				for(int ch = 0; ch < nCh; ch++){
-					int sizelimit = Math.max(50000000, bw*bh*bd*bdepth/8);
+					int sizelimit = bdsizelimit*1024*1024;
 					int bytecount = 0;
 					int filecount = 0;
-					byte[] packed_data = new byte[sizelimit];
+					int pd_bufsize = Math.max(sizelimit, bw*bh*bd*bdepth/8);
+					byte[] packed_data = new byte[pd_bufsize];
 					String base_dataname = basename + "_Lv" + String.valueOf(l) +
 													  "_Ch" + String.valueOf(ch)+
 													  "_Fr" + String.valueOf(f);
@@ -500,7 +507,7 @@ public class vvd_easy_export implements PlugIn {
 							compresser.end();
 						}
 
-						if (bytecount + datasize > sizelimit) {
+						if (bytecount + datasize > sizelimit && bytecount > 0) {
 							BufferedOutputStream fis = null;
 							try {
 								File file = new File(directory + current_dataname);
