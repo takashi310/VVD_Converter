@@ -253,7 +253,7 @@ public class vvd_easy_export implements PlugIn {
 			bd = bdlist.get(l).intValue();
 
 			boolean force_pow2 = false;
-			if(IsPowerOf2(bw) && IsPowerOf2(bh) && IsPowerOf2(bd)) force_pow2 = true;
+/*			if(IsPowerOf2(bw) && IsPowerOf2(bh) && IsPowerOf2(bd)) force_pow2 = true;
 			
 			if(force_pow2){
 				//force pow2
@@ -265,7 +265,11 @@ public class vvd_easy_export implements PlugIn {
 			if(bw > imageW) bw = (Pow2(imageW) == imageW) ? imageW : Pow2(imageW)/2;
 			if(bh > imageH) bh = (Pow2(imageH) == imageH) ? imageH : Pow2(imageH)/2;
 			if(bd > imageD) bd = (Pow2(imageD) == imageD) ? imageD : Pow2(imageD)/2;
-
+*/
+			if(bw > imageW) bw = imageW;
+			if(bh > imageH) bh = imageH;
+			if(bd > imageD) bd = imageD;
+			
 			if(bw <= 1 || bh <= 1 || bd <= 1) break;
 
 			if(filetype == "JPEG" && (bw < 8 || bh < 8)) break;
