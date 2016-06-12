@@ -3,6 +3,7 @@ import ij.io.*;
 import ij.process.*;
 import ij.gui.*;
 import java.awt.*;
+import java.awt.image.*;
 import ij.plugin.*;
 import ij.plugin.filter.*;
 import ij.plugin.frame.*;
@@ -10,9 +11,10 @@ import ij.plugin.frame.*;
 import java.io.*;
 import java.nio.*;
 import java.util.*;
+import java.util.zip.*;
 
-import java.util.zip.Inflater;
-
+import javax.imageio.*;
+import javax.imageio.stream.*;
 import javax.xml.parsers.*;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.*;
@@ -357,9 +359,10 @@ public class vvd_easy_export implements PlugIn {
 			int curbricknum = 0;
 			for(int f = 0; f < nFrame; f++){
 				for(int ch = 0; ch < nCh; ch++){
-					long sizelimit = 50000000;
-					long bytecount = 0;
+					int sizelimit = Math.max(50000000, bw*bh*bd*bdepth/8);
+					int bytecount = 0;
 					int filecount = 0;
+					byte[] packed_data = new byte[sizelimit];
 					String base_dataname = basename + "_Lv" + String.valueOf(l) +
 													  "_Ch" + String.valueOf(ch)+
 													  "_Fr" + String.valueOf(f);
@@ -454,15 +457,55 @@ public class vvd_easy_export implements PlugIn {
 													 "_Ch" + String.valueOf(ch) +
 													 "_Fr" + String.valueOf(f) +
 													 "_ID" + String.valueOf(i);
-					
+						int offset = bytecount;
+						int datasize = bdata.length;
+
 						if (filetype == "RAW") {
-							filename += ".raw";
+							int dummy = -1;
+							//do nothing
+						}
+						if (filetype == "JPEG" && bdepth == 8) {
+							try {
+								DataBufferByte db = new DataBufferByte(bdata, datasize);
+								Raster raster = Raster.createPackedRaster(db, b.w_, b.h_*b.d_, 8, null);
+								BufferedImage img = new BufferedImage(b.w_, b.h_*b.d_, BufferedImage.TYPE_BYTE_GRAY);
+								img.setData(raster);
+								ByteArrayOutputStream baos = new ByteArrayOutputStream();
+								ImageOutputStream ios = ImageIO.createImageOutputStream(baos);
+								String format = "jpg";
+								Iterator<javax.imageio.ImageWriter> iter = ImageIO.getImageWritersByFormatName("jpeg");
+								javax.imageio.ImageWriter writer = iter.next();
+								ImageWriteParam iwp = writer.getDefaultWriteParam();
+								iwp.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+								iwp.setCompressionQuality((float)jpeg_quality*0.01f);
+								writer.setOutput(ios);
+								writer.write(null, new IIOImage(img,null,null), iwp);
+								//ImageIO.write(img, format, baos);
+								bdata = baos.toByteArray();
+								datasize = bdata.length;
+							} catch (IOException e) {
+								e.printStackTrace();
+								return;
+							}
+						}
+						if (filetype == "ZLIB") {
+							byte[] tmpdata = new byte[b.w_*b.h_*b.d_*bdepth/8];
+							Deflater compresser = new Deflater();
+							compresser.setInput(bdata);
+							compresser.setLevel(Deflater.DEFAULT_COMPRESSION);
+							compresser.setStrategy(Deflater.DEFAULT_STRATEGY);
+							compresser.finish();
+							datasize = compresser.deflate(tmpdata);
+							bdata = tmpdata;
+							compresser.end();
+						}
+
+						if (bytecount + datasize > sizelimit) {
 							BufferedOutputStream fis = null;
 							try {
-								File file = new File(directory + filename);
+								File file = new File(directory + current_dataname);
 								fis = new BufferedOutputStream(new FileOutputStream(file));
-								fis.write(bdata);
-								
+								fis.write(packed_data, 0, bytecount);
 							} catch (IOException e) {
 								e.printStackTrace();
 								return;
@@ -474,26 +517,49 @@ public class vvd_easy_export implements PlugIn {
 									return;
 								}
 							}
-						}
-						if (filetype == "JPEG" && bdepth == 8) {
-							filename += ".jpg";
-							ByteProcessor bip = new ByteProcessor(b.w_, b.h_*b.d_, bdata);
-							FileSaver fs = new FileSaver(new ImagePlus("", bip));
-							fs.setJpegQuality(jpeg_quality);
-							fs.saveAsJpeg(directory + filename);
+							filecount++;
+							current_dataname = base_dataname+"_data"+filecount;
+							bytecount = 0;
+							System.arraycopy(bdata, 0, packed_data, bytecount, datasize);
+							bytecount += datasize;
+						} else {
+							System.arraycopy(bdata, 0, packed_data, bytecount, datasize);
+							bytecount += datasize;
 						}
 
 						Element filenode = doc.createElement("File");
-						filenode.setAttribute("filename", filename);
+						filenode.setAttribute("filename", current_dataname);
 						filenode.setAttribute("channel", String.valueOf(ch));
 						filenode.setAttribute("frame", String.valueOf(f));
 						filenode.setAttribute("brickID", String.valueOf(i));
+						filenode.setAttribute("offset", String.valueOf(offset));
+						filenode.setAttribute("datasize", String.valueOf(datasize));
+
 						fsnode.appendChild(filenode);
 	
 						curbricknum++;
 						IJ.showProgress((double)(curbricknum)/(double)(totalbricknum));
 
 					}
+					if (bytecount > 0) {
+						BufferedOutputStream fis = null;
+						try {
+							File file = new File(directory + current_dataname);
+							fis = new BufferedOutputStream(new FileOutputStream(file));
+							fis.write(packed_data, 0, bytecount);
+						} catch (IOException e) {
+							e.printStackTrace();
+							return;
+						} finally {
+							try {
+								if (fis != null) fis.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+								return;
+							}
+						}
+					}
+					
 				}
 			}
 
