@@ -283,7 +283,6 @@ public class vvd_easy_export implements PlugIn {
 			lvnode.setAttribute("yspc", String.valueOf(yspc));
 			lvnode.setAttribute("zspc", String.valueOf(zspc));
 			lvnode.setAttribute("bitDepth", String.valueOf(bdepth));
-			lvnode.setAttribute("FileType", filetype);
 			root.appendChild(lvnode);
 
 			Element brksnode = doc.createElement("Bricks");
@@ -546,6 +545,7 @@ public class vvd_easy_export implements PlugIn {
 						filenode.setAttribute("brickID", String.valueOf(i));
 						filenode.setAttribute("offset", String.valueOf(offset));
 						filenode.setAttribute("datasize", String.valueOf(datasize));
+						filenode.setAttribute("filetype", String.valueOf(filetype));
 
 						fsnode.appendChild(filenode);
 	
