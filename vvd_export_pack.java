@@ -507,10 +507,10 @@ public class vvd_export_pack implements PlugIn {
 										}
 										if (fftype.equals("ZLIB")) {
 											byte[] tmpdata = new byte[b.w_*b.h_*b.d_*fbd/8];
-											Deflater compresser = new Deflater();
+											Deflater compresser = new Deflater(Deflater.BEST_SPEED);
 											compresser.setInput(bdata);
-											compresser.setLevel(Deflater.DEFAULT_COMPRESSION);
-											compresser.setStrategy(Deflater.DEFAULT_STRATEGY);
+											//compresser.setLevel(Deflater.DEFAULT_COMPRESSION);
+											//compresser.setStrategy(Deflater.DEFAULT_STRATEGY);
 											compresser.finish();
 											datasize = compresser.deflate(tmpdata);
 											bdata = tmpdata;
