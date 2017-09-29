@@ -3,6 +3,7 @@ import ij.io.*;
 import ij.process.*;
 import ij.gui.*;
 import java.awt.*;
+import java.awt.image.*;
 import ij.plugin.*;
 import ij.plugin.filter.*;
 import ij.plugin.frame.*;
@@ -13,6 +14,8 @@ import java.util.*;
 import java.util.zip.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.imageio.*;
+import javax.imageio.stream.*;
 import javax.xml.parsers.*;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.*;
@@ -23,17 +26,17 @@ import org.w3c.dom.*;
 
 
 
-public class vvd_export implements PlugIn {
+public class vvd_export_pack implements PlugIn {
 	String basename;
 	String directory;
 	ArrayList<String> lvImgTitle;
 	int bw = 128, bh = 128, bd = 64, lv = 1;
-	String filetype = "RAW";
-	int jpeg_quality = FileSaver.DEFAULT_JPEG_QUALITY;
 	ArrayList<Integer> bwlist = new ArrayList<Integer>();
 	ArrayList<Integer> bhlist = new ArrayList<Integer>();
 	ArrayList<Integer> bdlist = new ArrayList<Integer>();
 	int thread_num_ = (int)Prefs.get("thread_num.int",4);
+	String filetype = (String)Prefs.get("filetype.string", "RAW");
+	int jpeg_quality = (int)Prefs.get("jpeg_quality.int",FileSaver.DEFAULT_JPEG_QUALITY);
 
 
 	class Brick {
@@ -338,6 +341,14 @@ public class vvd_export implements PlugIn {
 					int st_z = 0;
 					int ed_z = 0;
 					LinkedList<ImageProcessor> iplist = new LinkedList<ImageProcessor>();
+					
+					long bytecount = 0;
+					long filecount = 0;
+					String base_dataname = basename + "_Lv" + String.valueOf(l) +
+													  "_Ch" + String.valueOf(ch)+
+													  "_Fr" + String.valueOf(f);
+					String current_dataname = base_dataname+"_data"+filecount;
+					
 					for (int ll = 0; ll < xy_brk_count.size(); ll++) {
 						Brick b_first = bricks.get(first_bid);
 
@@ -403,10 +414,14 @@ public class vvd_export implements PlugIn {
 						for (int e = 0; e < xy_brk_count.get(ll); e++)
 							elems.add(doc.createElement("File"));
 
+						final byte[][] data_array = new byte[xy_brk_count.get(ll)][]; 
+
 						final int fbd = bdepth;
 						final int flv = l;
 						final int fch = ch;
 						final int ffr = f;
+
+						final String fdataname = current_dataname;
 		
 						for (int ithread = 0; ithread < threads.length; ithread++) {
 							// Concurrently run in as many threads as CPUs
@@ -461,74 +476,95 @@ public class vvd_export implements PlugIn {
 											}
 										}
 
-										String filename = fbasename + "_Lv" + String.valueOf(flv) +
-																	  "_Ch" + String.valueOf(fch) +
-																	  "_Fr" + String.valueOf(ffr) +
-																	  "_ID" + String.valueOf(i);
-					
+										int datasize = bdata.length;
+
 										if (fftype.equals("RAW")) {
-											filename += ".raw";
-											BufferedOutputStream fis = null;
+											int dummy = -1;
+											//do nothing
+										}
+										if (fftype.equals("JPEG") && fbd == 8) {
 											try {
-												File file = new File(directory + filename);
-												fis = new BufferedOutputStream(new FileOutputStream(file));
-												fis.write(bdata);
-												fis.close();
-												fis = null;
+												DataBufferByte db = new DataBufferByte(bdata, datasize);
+												Raster raster = Raster.createPackedRaster(db, b.w_, b.h_*b.d_, 8, null);
+												BufferedImage img = new BufferedImage(b.w_, b.h_*b.d_, BufferedImage.TYPE_BYTE_GRAY);
+												img.setData(raster);
+												ByteArrayOutputStream baos = new ByteArrayOutputStream();
+												ImageOutputStream ios = ImageIO.createImageOutputStream(baos);
+												String format = "jpg";
+												Iterator<javax.imageio.ImageWriter> iter = ImageIO.getImageWritersByFormatName("jpeg");
+												javax.imageio.ImageWriter writer = iter.next();
+												ImageWriteParam iwp = writer.getDefaultWriteParam();
+												iwp.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+												iwp.setCompressionQuality((float)jpeg_quality*0.01f);
+												writer.setOutput(ios);
+												writer.write(null, new IIOImage(img,null,null), iwp);
+												bdata = baos.toByteArray();
+												datasize = bdata.length;
 											} catch (IOException e) {
 												e.printStackTrace();
 												return;
 											}
-										}
-										if (fftype.equals("JPEG") && fbd == 8) {
-											filename += ".jpg";
-											ByteProcessor bip = new ByteProcessor(b.w_, b.h_*b.d_, bdata);
-											FileSaver fs = new FileSaver(new ImagePlus("", bip));
-											fs.setJpegQuality(jpeg_quality);
-											fs.saveAsJpeg(directory + filename);
-											fs = null;
-											bip = null;
 										}
 										if (fftype.equals("ZLIB")) {
 											byte[] tmpdata = new byte[b.w_*b.h_*b.d_*fbd/8];
-											Deflater compresser = new Deflater(Deflater.BEST_SPEED);
+											Deflater compresser = new Deflater();
 											compresser.setInput(bdata);
+											compresser.setLevel(Deflater.DEFAULT_COMPRESSION);
+											compresser.setStrategy(Deflater.DEFAULT_STRATEGY);
 											compresser.finish();
-											int datasize = compresser.deflate(tmpdata);
-											//IJ.log(""+datasize);
+											datasize = compresser.deflate(tmpdata);
+											bdata = tmpdata;
 											compresser.end();
-							
-											filename += ".zlib";
-											BufferedOutputStream fis = null;
-											try {
-												File file = new File(directory + filename);
-												fis = new BufferedOutputStream(new FileOutputStream(file));
-												fis.write(tmpdata, 0, datasize);
-												fis.close();
-											} catch (IOException e) {
-												e.printStackTrace();
-												return;
-											}
-											tmpdata = null;
-										}//if (filetype == "ZLIB") {
+										}
+
+										if (bdata.length != datasize)
+										{
+											byte[] tmpdata2 = new byte[datasize];
+											System.arraycopy(bdata, 0, tmpdata2, 0, datasize);
+											bdata = tmpdata2;
+										}
+
+										data_array[i-st_bid] = bdata;
 
 										Element filenode = elems.get(i - st_bid);
-										filenode.setAttribute("filename", filename);
+										filenode.setAttribute("filename", fdataname);
 										filenode.setAttribute("channel", String.valueOf(fch));
 										filenode.setAttribute("frame", String.valueOf(ffr));
 										filenode.setAttribute("brickID", String.valueOf(i));
 										filenode.setAttribute("filetype", String.valueOf(fftype));
-											
-										bdata = null;
 
 									}//	for (int i = ai.getAndIncrement(); i < names.length;
 							}};//threads[ithread] = new Thread() {
 						}//	for (int ithread = 0; ithread < threads.length; ithread++) {
 						
 						startAndJoin(threads);
-						for (Element e : elems) fsnode.appendChild(e);
+						
+						BufferedOutputStream fis = null;
+						try {
+							File file = new File(directory + current_dataname);
+							fis = new BufferedOutputStream(new FileOutputStream(file, bytecount == 0 ? false : true));
+							for (int d = 0; d < data_array.length; d++) {
+								long offset = bytecount;
+								long datasize = data_array[d].length;
+								elems.get(d).setAttribute("offset", String.valueOf(offset));
+								elems.get(d).setAttribute("datasize", String.valueOf(datasize));
+								fsnode.appendChild(elems.get(d));
+								fis.write(data_array[d]);
+								bytecount += datasize;
+							}
+						} catch (IOException e) {
+							e.printStackTrace();
+							return;
+						} finally {
+							try {
+								if (fis != null) fis.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+								return;
+							}
+						}
+						
 						first_bid += xy_brk_count.get(ll);
-
 						System.gc();
 					}
 					iplist.clear();
