@@ -220,6 +220,12 @@ public class vvd_export_pack implements PlugIn {
 			bh = bhlist.get(l).intValue();
 			bd = bdlist.get(l).intValue();
 
+			if (l == lv - 1) {
+				bw = imageW;
+				bh = imageH;
+				bd = imageD;
+			}
+
 			boolean force_pow2 = false;
 			if(IsPowerOf2(bw) && IsPowerOf2(bh) && IsPowerOf2(bd)) force_pow2 = true;
 			
