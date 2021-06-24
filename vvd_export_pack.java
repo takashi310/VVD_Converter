@@ -440,7 +440,7 @@ public class vvd_export_pack implements PlugIn {
 									for (int i = ai.getAndIncrement(); i <= ed_bid; i = ai.getAndIncrement()) {
 										Brick b = bricks.get(i);
 										int bsize = 0;
-										byte[] bdata = new byte[b.w_*b.h_*b.d_*fbd/8];
+										byte[] bdata = new byte[b.w_*b.h_*b.d_*(fbd/8)];
 
 										for (int p = 0; p < iplist_final.size(); p++){
 											ImageProcessor ip = iplist_final.get(p);
@@ -467,7 +467,7 @@ public class vvd_export_pack implements PlugIn {
 												data = null;
 												buffer = null;
 											} else if (fbd == 32) {
-												ByteBuffer buffer = ByteBuffer.allocate(b.w_*b.h_*fbd/8);
+												ByteBuffer buffer = ByteBuffer.allocate(b.w_*b.h_*(fbd/8));
 												buffer.order(ByteOrder.LITTLE_ENDIAN);
 												float[] data = (float[])ip.getPixels();
 												for (int yy = b.y_; yy < b.y_+b.h_; yy++) {
@@ -512,7 +512,7 @@ public class vvd_export_pack implements PlugIn {
 											}
 										}
 										if (fftype.equals("ZLIB")) {
-											byte[] tmpdata = new byte[b.w_*b.h_*b.d_*fbd/8];
+											byte[] tmpdata = new byte[b.w_*b.h_*b.d_*(fbd/8)];
 											Deflater compresser = new Deflater(Deflater.BEST_SPEED);
 											compresser.setInput(bdata);
 											//compresser.setLevel(Deflater.DEFAULT_COMPRESSION);
