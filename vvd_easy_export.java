@@ -33,6 +33,8 @@ public class vvd_easy_export implements PlugIn {
 	String filetype = (String)Prefs.get("filetype.string", "RAW");
 	int jpeg_quality = (int)Prefs.get("jpeg_quality.int",FileSaver.DEFAULT_JPEG_QUALITY);
 	int bdsizelimit = (int)Prefs.get("bdsizelimit.int", 50);
+	double downsampling_factor_xy = (double)Prefs.get("VVDC.downsampling_factor_xy.double", 1.5);
+	double downsampling_factor_z = (double)Prefs.get("VVDC.downsampling_factor_z.double", 1.5);
 	ArrayList<Integer> bwlist = new ArrayList<Integer>();
 	ArrayList<Integer> bhlist = new ArrayList<Integer>();
 	ArrayList<Integer> bdlist = new ArrayList<Integer>();
@@ -72,7 +74,9 @@ public class vvd_easy_export implements PlugIn {
 		GenericDialog gd = new GenericDialog("Generate Bricks");
 		gd.addChoice("FileType", types, filetype);
 		gd.addNumericField("JPEG quality", jpeg_quality, 0);
-		gd.addNumericField("Max file size (MB)", bdsizelimit, 0);
+		gd.addNumericField("MaxFileSizeMB", bdsizelimit, 0);
+		gd.addNumericField("DownsamplingFacXY", downsampling_factor_xy, 2);
+		gd.addNumericField("DownsamplingFacZ", downsampling_factor_z, 2);
 
 		int[] wlist = WindowManager.getIDList();
 		if(wlist == null)return false;
@@ -106,6 +110,8 @@ public class vvd_easy_export implements PlugIn {
 		Prefs.set("filetype.string", filetype);
 		Prefs.set("jpeg_quality.int", jpeg_quality);
 		Prefs.set("bdsizelimit.int", bdsizelimit);
+		Prefs.set("VVDC.downsampling_factor_xy.double", downsampling_factor_xy);
+		Prefs.set("VVDC.downsampling_factor_z.double", downsampling_factor_z);
 		
 		return true;
 	}
@@ -172,18 +178,15 @@ public class vvd_easy_export implements PlugIn {
 		IJ.log("BaseZ: " + baseZ);
 */
 
-		int baseXY = 256;
-		int baseZ = 128;
-		int dbXY = Math.max(orgW, orgH)/baseXY;
-		if (Math.max(orgW, orgH) % baseXY > 0) dbXY *= 2;
-		int dbZ = orgD/baseZ;
-		if (orgD % baseZ > 0) dbZ *= 2;
-		lv = Math.max(log2(dbXY), log2(dbZ)) + 1;
+		int baseXY = 512;
+		int baseZ = 256;
+		
+		lv = 0;
 
 		int ww = orgW;
 		int hh = orgH;
 		int dd = orgD;
-		for (int l = 0; l < lv; l++){
+		while(true){
 			int bwnum = ww / baseXY; if (ww % baseXY > 0) bwnum++;
 			int bhnum = hh / baseXY; if (hh % baseXY > 0) bhnum++;
 			int bdnum = dd / baseZ;  if (dd % baseZ  > 0) bdnum++;
@@ -200,7 +203,7 @@ public class vvd_easy_export implements PlugIn {
 			bhlist.add(bh);
 			bdlist.add(bd);
 
-			IJ.log("LEVEL: " + l);
+			IJ.log("LEVEL: " + lv);
 			IJ.log("  width: " + ww);
 			IJ.log("  hight: " + hh);
 			IJ.log("  depth: " + dd);
@@ -208,21 +211,20 @@ public class vvd_easy_export implements PlugIn {
 			IJ.log("  bh: " + bh);
 			IJ.log("  bd: " + bd);
 			
-			int xyl2 = Math.max(ww, hh)/baseXY;
-			if (Math.max(ww, hh) % baseXY > 0) xyl2 *= 2;
-			if (lv-1-log2(xyl2) <= l) { ww /= 2; hh /= 2; }
-			IJ.log("  xyl2: " + (lv-1-log2(xyl2)));
+			ww = (int)(ww * pow(downsample_xy, lv+1));
+			hh = (int)(hh * pow(downsample_xy, lv+1));
+			dd = (int)(dd * pow(downsample_z, lv+1));
+			lv += 1;
 			
-			int zl2 = dd/baseZ;
-			if (dd % baseZ > 0) zl2 *= 2;
-			if (lv-1-log2(zl2) <= l) dd /= 2;
-			IJ.log("  zl2: " + (lv-1-log2(zl2)));
-
-			if (l < lv-1) {
-				lvImgTitle.add(lvImgTitle.get(0)+"_level"+(l+1));
+			BigDecimal voxnum = BigDecimal.valueOf(ww).multiply(BigDecimal.valueOf(hh)).multiply(BigDecimal.valueOf(dd));
+			
+			if (voxnum.compareTo(BigDecimal.valueOf(10 * 1024 * 1024)) > 0) {
+				lvImgTitle.add(lvImgTitle.get(0)+"_level"+(lv));
 				IJ.selectWindow(lvImgTitle.get(0));
-				IJ.run("Scale...", "x=- y=- z=- width="+ww+" height="+hh+" depth="+dd+" interpolation=Bicubic average process create title="+lvImgTitle.get(l+1));
+				IJ.run("Scale...", "x=- y=- z=- width="+ww+" height="+hh+" depth="+dd+" interpolation=Bicubic average process create title="+lvImgTitle.get(lv));
 			}
+			else
+				break;
 		}
 		
 		for (int l = 0; l < lv; l++){
